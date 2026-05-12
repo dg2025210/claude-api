@@ -1,6 +1,5 @@
 import streamlit as st
 from anthropic import Anthropic
-import json
 
 # ─────────────────────────────────────────────
 # 페이지 기본 설정
@@ -28,23 +27,6 @@ st.markdown("""
         font-size: 1.1rem;
         margin-bottom: 2rem;
     }
-    .type-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 2rem;
-        border-radius: 20px;
-        text-align: center;
-        margin: 1rem 0;
-    }
-    .type-code {
-        font-size: 3rem;
-        font-weight: bold;
-        letter-spacing: 5px;
-    }
-    .type-name {
-        font-size: 1.5rem;
-        margin-top: 0.5rem;
-    }
     .question-box {
         background-color: #f8f9fa;
         border-left: 4px solid #667eea;
@@ -60,22 +42,23 @@ st.markdown("""
         font-weight: bold;
         color: #667eea;
     }
-    .choice-btn {
-        margin: 0.3rem 0;
-    }
-    .result-section {
-        background-color: #f0f2f6;
-        padding: 1.5rem;
-        border-radius: 15px;
-        margin: 1rem 0;
-    }
-    .compatibility-good {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
+    .review-item {
+        background-color: #f8f9fa;
         padding: 1rem;
         border-radius: 10px;
-        text-align: center;
         margin: 0.5rem 0;
+        border-left: 3px solid #667eea;
+    }
+    .review-item-unanswered {
+        background-color: #fff3cd;
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 0.5rem 0;
+        border-left: 3px solid #ffc107;
+    }
+    .selected-answer {
+        color: #667eea;
+        font-weight: bold;
     }
     .token-info {
         background-color: #e8f4f8;
@@ -83,6 +66,20 @@ st.markdown("""
         border-radius: 8px;
         font-size: 0.85rem;
         text-align: center;
+        margin-top: 1rem;
+    }
+    .submit-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 20px;
+        text-align: center;
+        margin: 2rem 0;
+    }
+    .nav-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 1rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -278,13 +275,12 @@ SBTI_QUESTIONS = [
     },
     {
         "id": 30,
-        "text": "태도 모델 - 낙관성 보충: 내 마음속에 진심으로 추구하는 게 있어.",
-        "choices": {"A": "비동의", "B": "중립", "C": "동의"},
+        "text": "난 가끔 세상이 다 부질없다고 느껴.",
+        "choices": {"A": "동의", "B": "중립", "C": "비동의"},
         "model": "태도", "dimension": "낙관성"
     },
 ]
 
-# 보너스 문항 (히든 유형 판별용)
 SBTI_BONUS = [
     {
         "id": "B1",
@@ -293,7 +289,6 @@ SBTI_BONUS = [
     },
 ]
 
-# SBTI 유형 목록
 SBTI_TYPES = {
     "주도/행동형": [
         {"code": "CTRL", "name": "장악자"},
@@ -333,46 +328,44 @@ SBTI_TYPES = {
 }
 
 # ─────────────────────────────────────────────
-# L/M/H 매핑 테이블
+# L/M/H 매핑
 # ─────────────────────────────────────────────
 LMH_MAP = {
-    # 대부분 A=L, B=M, C=H 이지만 문항에 따라 역전되는 경우 처리
-    1: {"A": "H", "B": "M", "C": "L"},      # 동의=H
-    2: {"A": "H", "B": "M", "C": "L"},      # 공감=H (울었어=자기수용 높음은 아니고, 감정이입 높음)
-    3: {"A": "L", "B": "M", "C": "H"},      # 계획 잘 지킴=H
-    4: {"A": "H", "B": "M", "C": "L"},      # 울타리 동의=거리감 H
-    5: {"A": "L", "B": "M", "C": "H"},      # 신경 안 씀=H
-    6: {"A": "L", "B": "M", "C": "H"},      # 진심=H
-    7: {"A": "L", "B": "M", "C": "H"},      # 적극적=H
-    8: {"A": "L", "B": "M", "C": "H"},      # 독립적=H
-    9: {"A": "H", "B": "M", "C": "L"},      # 걱정 많음=정서불안 H → 정서안정 L 역전
-    10: {"A": "L", "B": "M", "C": "H"},     # 어두운 면 숨김=H
-    11: {"A": "L", "B": "M", "C": "H"},     # 실행력 높음=H
-    12: {"A": "L", "B": "M", "C": "H"},     # 자신감=H
-    13: {"A": "L", "B": "M", "C": "H"},     # 성과지향=H
-    14: {"A": "L", "B": "M", "C": "H"},     # 직감=개방성
-    15: {"A": "L", "B": "M", "C": "H"},     # 성장욕구=H
-    16: {"A": "L", "B": "M", "C": "H"},     # 목표지향=H
-    17: {"A": "L", "B": "M", "C": "H"},     # 헛소리=낙관적=H
-    18: {"A": "L", "B": "M", "C": "H"},     # 적극해결=H
-    19: {"A": "L", "B": "M", "C": "H"},     # 적극 만남=H
-    20: {"A": "L", "B": "M", "C": "H"},     # 신뢰=H
-    21: {"A": "L", "B": "M", "C": "H"},     # 감정몰입=H
-    22: {"A": "H", "B": "M", "C": "L"},     # 관습 깨기 동의=H
-    23: {"A": "L", "B": "M", "C": "H"},     # 추구하는 것=H
-    24: {"A": "L", "B": "M", "C": "H"},     # 개인공간 중시=H
-    25: {"A": "L", "B": "M", "C": "H"},     # 빠른 결정=H
-    26: {"A": "L", "B": "M", "C": "H"},     # 신뢰=H
-    27: {"A": "L", "B": "M", "C": "H"},     # 다른 모습=H (역 코딩: 일관성 낮음)
-    28: {"A": "L", "B": "M", "C": "H"},     # 이성적 판단=H
-    29: {"A": "L", "B": "M", "C": "H"},     # 자기인식=H
-    30: {"A": "L", "B": "M", "C": "H"},     # 낙관성=H
+    1: {"A": "H", "B": "M", "C": "L"},
+    2: {"A": "H", "B": "M", "C": "L"},
+    3: {"A": "L", "B": "M", "C": "H"},
+    4: {"A": "H", "B": "M", "C": "L"},
+    5: {"A": "L", "B": "M", "C": "H"},
+    6: {"A": "L", "B": "M", "C": "H"},
+    7: {"A": "L", "B": "M", "C": "H"},
+    8: {"A": "L", "B": "M", "C": "H"},
+    9: {"A": "H", "B": "M", "C": "L"},
+    10: {"A": "L", "B": "M", "C": "H"},
+    11: {"A": "L", "B": "M", "C": "H"},
+    12: {"A": "L", "B": "M", "C": "H"},
+    13: {"A": "L", "B": "M", "C": "H"},
+    14: {"A": "L", "B": "M", "C": "H"},
+    15: {"A": "L", "B": "M", "C": "H"},
+    16: {"A": "L", "B": "M", "C": "H"},
+    17: {"A": "L", "B": "M", "C": "H"},
+    18: {"A": "L", "B": "M", "C": "H"},
+    19: {"A": "L", "B": "M", "C": "H"},
+    20: {"A": "L", "B": "M", "C": "H"},
+    21: {"A": "L", "B": "M", "C": "H"},
+    22: {"A": "H", "B": "M", "C": "L"},
+    23: {"A": "L", "B": "M", "C": "H"},
+    24: {"A": "L", "B": "M", "C": "H"},
+    25: {"A": "L", "B": "M", "C": "H"},
+    26: {"A": "L", "B": "M", "C": "H"},
+    27: {"A": "L", "B": "M", "C": "H"},
+    28: {"A": "L", "B": "M", "C": "H"},
+    29: {"A": "L", "B": "M", "C": "H"},
+    30: {"A": "L", "B": "M", "C": "H"},
 }
 
 
 def calculate_sbti_pattern(answers):
-    """응답을 기반으로 15차원 L/M/H 패턴 생성"""
-    # 5대 모델 × 3차원 점수 집계
+    """응답 기반 15차원 L/M/H 패턴 생성"""
     dimensions = {
         "자아_자기인식": [], "자아_자기수용": [], "자아_자아일관성": [],
         "감정_정서안정": [], "감정_감정표현": [], "감정_공감력": [],
@@ -391,7 +384,6 @@ def calculate_sbti_pattern(answers):
                 score = {"L": 1, "M": 2, "H": 3}.get(lmh, 2)
                 dimensions[key].append(score)
 
-    # 각 차원의 평균으로 최종 L/M/H 결정
     pattern = {}
     for key, scores in dimensions.items():
         if scores:
@@ -409,7 +401,7 @@ def calculate_sbti_pattern(answers):
 
 
 def pattern_to_string(pattern):
-    """패턴을 문자열로 변환"""
+    """패턴을 읽기 쉬운 문자열로 변환"""
     models = ["자아", "감정", "태도", "행동", "사회"]
     dims = {
         "자아": ["자기인식", "자기수용", "자아일관성"],
@@ -430,11 +422,8 @@ def pattern_to_string(pattern):
 
 def check_hidden_type(answers, bonus_answers):
     """히든 유형 조건 체크"""
-    # DRUNK: 보너스 문항에서 음주 선택
     if bonus_answers.get("B1") == "C":
         return "DRUNK"
-
-    # HHHH: 모든 답변이 극단적 (전부 A 또는 전부 C)
     if answers:
         all_values = list(answers.values())
         a_count = all_values.count("A")
@@ -442,63 +431,42 @@ def check_hidden_type(answers, bonus_answers):
         total = len(all_values)
         if total > 0 and (a_count / total >= 0.85 or c_count / total >= 0.85):
             return "HHHH"
-
     return None
 
 
 # ─────────────────────────────────────────────
 # 세션 상태 초기화
 # ─────────────────────────────────────────────
-if "page" not in st.session_state:
-    st.session_state["page"] = "home"
-
-if "test_type" not in st.session_state:
-    st.session_state["test_type"] = None
-
-if "sbti_answers" not in st.session_state:
-    st.session_state["sbti_answers"] = {}
-
-if "sbti_bonus_answers" not in st.session_state:
-    st.session_state["sbti_bonus_answers"] = {}
-
-if "sbti_current_q" not in st.session_state:
-    st.session_state["sbti_current_q"] = 0
-
-if "mbti_messages" not in st.session_state:
-    st.session_state["mbti_messages"] = []
-
-if "mbti_result" not in st.session_state:
-    st.session_state["mbti_result"] = None
-
-if "sbti_result" not in st.session_state:
-    st.session_state["sbti_result"] = None
-
-if "total_input_tokens" not in st.session_state:
-    st.session_state["total_input_tokens"] = 0
-
-if "total_output_tokens" not in st.session_state:
-    st.session_state["total_output_tokens"] = 0
+defaults = {
+    "page": "home",
+    "test_type": None,
+    "sbti_answers": {},
+    "sbti_bonus_answers": {},
+    "sbti_current_q": 0,
+    "mbti_messages": [],
+    "mbti_result": None,
+    "sbti_result": None,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+}
+for key, val in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = val
 
 
 def reset_all():
     """전체 초기화"""
-    st.session_state["page"] = "home"
-    st.session_state["test_type"] = None
-    st.session_state["sbti_answers"] = {}
-    st.session_state["sbti_bonus_answers"] = {}
-    st.session_state["sbti_current_q"] = 0
-    st.session_state["mbti_messages"] = []
-    st.session_state["mbti_result"] = None
-    st.session_state["sbti_result"] = None
+    for key, val in defaults.items():
+        if key not in ("total_input_tokens", "total_output_tokens"):
+            st.session_state[key] = val if not isinstance(val, (dict, list)) else type(val)()
 
 
 # ─────────────────────────────────────────────
-# 페이지: 홈
+# 홈 페이지
 # ─────────────────────────────────────────────
 def show_home():
     st.markdown("<p class='main-title'>🧠 성격 유형 검사</p>", unsafe_allow_html=True)
     st.markdown("<p class='sub-title'>AI와 함께하는 MBTI & SBTI 검사</p>", unsafe_allow_html=True)
-
     st.markdown("---")
 
     col1, col2 = st.columns(2, gap="large")
@@ -530,7 +498,7 @@ def show_home():
         뼈 때리는 팩폭 결과!
 
         - 📝 30문항 선택형
-        - 🎯 패턴 매칭 알고리즘
+        - ⬅️ 이전 버튼으로 수정 가능
         - 💀 풍자적 팩폭 분석
         """)
         if st.button("🎭 SBTI 검사 시작", use_container_width=True, key="sbti_btn"):
@@ -546,7 +514,7 @@ def show_home():
 
 
 # ─────────────────────────────────────────────
-# 페이지: MBTI 검사 (AI 대화형)
+# MBTI 검사 (AI 대화형)
 # ─────────────────────────────────────────────
 def show_mbti_test():
     st.markdown("<p class='main-title'>🔮 MBTI 검사</p>", unsafe_allow_html=True)
@@ -558,35 +526,34 @@ def show_mbti_test():
 
     st.markdown("---")
 
-    MBTI_SYSTEM_PROMPT = """당신은 MBTI 성격 유형 전문 분석가입니다.
+    MBTI_SYSTEM = """당신은 MBTI 성격 유형 전문 분석가입니다.
 
-당신의 역할:
+역할:
 1. 사용자에게 자연스러운 대화형 질문을 하나씩 해서 MBTI 4가지 지표(E/I, S/N, T/F, J/P)를 파악합니다.
-2. 질문은 한 번에 하나만 하세요. 일상적이고 재미있는 상황 질문을 하세요.
-3. 총 8~12개 정도의 질문을 한 후, 충분히 파악했다고 판단되면 결과를 알려주세요.
-4. 결과를 알려줄 때는 반드시 아래 형식을 포함하세요:
+2. 질문은 한 번에 하나만. 일상적이고 재미있는 상황 질문을 하세요.
+3. 총 8~12개 질문 후 충분히 파악되면 결과를 알려주세요.
+4. 결과를 알려줄 때 반드시 아래 형식 포함:
 
 ===MBTI결과===
-유형: (4글자 코드)
+유형: (4글자)
 별명: (재미있는 별명)
-설명: (3-4줄 설명)
+설명: (3-4줄)
 장점: (2-3개)
 단점: (2-3개)
-잘 맞는 유형: (2-3개 유형과 이유)
-안 맞는 유형: (1-2개 유형과 이유)
+잘 맞는 유형: (2-3개 + 이유)
+안 맞는 유형: (1-2개 + 이유)
 ===결과끝===
 
-5. 한국어로 대화하고, 친근하고 재미있게 말해주세요. 반말로 해주세요.
-6. 첫 메시지에서 간단히 인사하고 첫 번째 질문을 하세요."""
+5. 한국어, 친근한 반말로 대화하세요.
+6. 첫 메시지에서 인사 + 첫 질문."""
 
-    # 첫 메시지 생성
     if not st.session_state["mbti_messages"]:
         with st.spinner("AI가 준비 중..."):
             try:
                 response = client.messages.create(
                     model="claude-sonnet-4-20250514",
                     max_tokens=500,
-                    system=MBTI_SYSTEM_PROMPT,
+                    system=MBTI_SYSTEM,
                     messages=[{"role": "user", "content": "안녕! MBTI 검사 해줘!"}],
                 )
                 ai_msg = response.content[0].text
@@ -599,7 +566,6 @@ def show_mbti_test():
                 st.error(f"오류: {e}")
                 return
 
-    # 대화 표시
     for msg in st.session_state["mbti_messages"]:
         if msg["role"] == "user" and msg["content"] == "안녕! MBTI 검사 해줘!":
             continue
@@ -607,7 +573,6 @@ def show_mbti_test():
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
 
-    # 결과 확인
     last_ai = ""
     for msg in reversed(st.session_state["mbti_messages"]):
         if msg["role"] == "assistant":
@@ -627,20 +592,17 @@ def show_mbti_test():
             st.rerun()
         return
 
-    # 사용자 입력
     user_input = st.chat_input("답변을 입력하세요...")
 
     if user_input:
         st.session_state["mbti_messages"].append({"role": "user", "content": user_input})
-
         with st.spinner("AI가 분석 중..."):
             try:
-                api_messages = [m for m in st.session_state["mbti_messages"]]
                 response = client.messages.create(
                     model="claude-sonnet-4-20250514",
                     max_tokens=800,
-                    system=MBTI_SYSTEM_PROMPT,
-                    messages=api_messages,
+                    system=MBTI_SYSTEM,
+                    messages=st.session_state["mbti_messages"],
                 )
                 ai_msg = response.content[0].text
                 st.session_state["total_input_tokens"] += response.usage.input_tokens
@@ -653,7 +615,7 @@ def show_mbti_test():
 
 
 # ─────────────────────────────────────────────
-# 페이지: SBTI 검사 (문항 선택형)
+# SBTI 검사 (문항 선택형 + 이전/다음 버튼)
 # ─────────────────────────────────────────────
 def show_sbti_test():
     st.markdown("<p class='main-title'>🎭 SBTI 검사</p>", unsafe_allow_html=True)
@@ -663,75 +625,249 @@ def show_sbti_test():
         reset_all()
         st.rerun()
 
-    total_q = len(SBTI_QUESTIONS) + len(SBTI_BONUS)
+    all_questions = SBTI_QUESTIONS + SBTI_BONUS
+    total_q = len(all_questions)
     current = st.session_state["sbti_current_q"]
 
-    # 진행률 표시
-    progress = current / total_q
+    # 진행률
+    answered_count = len(st.session_state["sbti_answers"]) + len(st.session_state["sbti_bonus_answers"])
+    progress = answered_count / total_q
     st.progress(progress)
-    st.markdown(f"<p class='progress-text'>📝 {current} / {total_q} 문항 완료</p>", unsafe_allow_html=True)
+    st.markdown(f"<p class='progress-text'>📝 {answered_count} / {total_q} 문항 응답 완료 | 현재: {current + 1}번</p>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # 모든 문항 완료 → 결과 페이지로
+    # 제출 확인 페이지
     if current >= total_q:
-        st.session_state["page"] = "sbti_result"
+        st.session_state["page"] = "sbti_review"
         st.rerun()
         return
 
     # 현재 문항 표시
-    if current < len(SBTI_QUESTIONS):
-        q = SBTI_QUESTIONS[current]
-        q_num = current + 1
-        q_id = q["id"]
+    q = all_questions[current]
+    is_bonus = current >= len(SBTI_QUESTIONS)
 
-        st.markdown(f"### 제{q_num}문")
-        st.markdown(f"<div class='question-box'>{q['text']}</div>", unsafe_allow_html=True)
+    if is_bonus:
+        st.markdown("### 🎁 보너스 문항")
+    else:
+        st.markdown(f"### 제{current + 1}문")
 
-        for key, value in q["choices"].items():
-            if st.button(f"{key}) {value}", key=f"sbti_q{q_id}_{key}", use_container_width=True):
-                st.session_state["sbti_answers"][q_id] = key
+    st.markdown(f"<div class='question-box'>{q['text']}</div>", unsafe_allow_html=True)
+
+    # 이미 답한 경우 표시
+    if is_bonus:
+        prev_answer = st.session_state["sbti_bonus_answers"].get(q["id"])
+    else:
+        prev_answer = st.session_state["sbti_answers"].get(q["id"])
+
+    if prev_answer:
+        st.info(f"✅ 이전 응답: **{prev_answer}) {q['choices'][prev_answer]}** — 다시 선택하면 변경됩니다.")
+
+    # 선택지 버튼
+    for key, value in q["choices"].items():
+        # 이전에 선택한 답이면 강조
+        btn_label = f"{'👉 ' if prev_answer == key else ''}{key}) {value}"
+        if st.button(btn_label, key=f"q_{current}_{key}", use_container_width=True):
+            if is_bonus:
+                st.session_state["sbti_bonus_answers"][q["id"]] = key
+            else:
+                st.session_state["sbti_answers"][q["id"]] = key
+            # 자동으로 다음 문항으로
+            if current < total_q - 1:
                 st.session_state["sbti_current_q"] = current + 1
+            else:
+                st.session_state["sbti_current_q"] = total_q
+            st.rerun()
+
+    # ─── 이전 / 다음 네비게이션 버튼 ───
+    st.markdown("---")
+    nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
+
+    with nav_col1:
+        if current > 0:
+            if st.button("⬅️ 이전 문항", key="prev_btn", use_container_width=True):
+                st.session_state["sbti_current_q"] = current - 1
                 st.rerun()
 
-    else:
-        # 보너스 문항
-        bonus_idx = current - len(SBTI_QUESTIONS)
-        if bonus_idx < len(SBTI_BONUS):
-            q = SBTI_BONUS[bonus_idx]
+    with nav_col2:
+        # 문항 점프 기능
+        jump_to = st.number_input(
+            "문항 이동",
+            min_value=1,
+            max_value=total_q,
+            value=current + 1,
+            step=1,
+            key="jump_input",
+            label_visibility="collapsed"
+        )
+        if st.button("🔢 이동", key="jump_btn", use_container_width=True):
+            st.session_state["sbti_current_q"] = jump_to - 1
+            st.rerun()
 
-            st.markdown(f"### 🎁 보너스 문항")
-            st.markdown(f"<div class='question-box'>{q['text']}</div>", unsafe_allow_html=True)
-
-            for key, value in q["choices"].items():
-                if st.button(f"{key}) {value}", key=f"sbti_bonus_{q['id']}_{key}", use_container_width=True):
-                    st.session_state["sbti_bonus_answers"][q["id"]] = key
-                    st.session_state["sbti_current_q"] = current + 1
-                    st.rerun()
+    with nav_col3:
+        if current < total_q - 1:
+            if st.button("다음 문항 ➡️", key="next_btn", use_container_width=True):
+                st.session_state["sbti_current_q"] = current + 1
+                st.rerun()
+        else:
+            if st.button("📋 제출 확인 ➡️", key="to_review_btn", use_container_width=True):
+                st.session_state["sbti_current_q"] = total_q
+                st.rerun()
 
 
 # ─────────────────────────────────────────────
-# 페이지: SBTI 결과
+# SBTI 제출 확인 페이지
+# ─────────────────────────────────────────────
+def show_sbti_review():
+    st.markdown("<p class='main-title'>📋 응답 확인</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>제출 전에 답변을 확인하고 수정할 수 있어요!</p>", unsafe_allow_html=True)
+
+    if st.button("🏠 홈으로", key="review_home"):
+        reset_all()
+        st.rerun()
+
+    st.markdown("---")
+
+    all_questions = SBTI_QUESTIONS + SBTI_BONUS
+    total_q = len(all_questions)
+
+    answered_main = len(st.session_state["sbti_answers"])
+    answered_bonus = len(st.session_state["sbti_bonus_answers"])
+    answered_total = answered_main + answered_bonus
+    unanswered = total_q - answered_total
+
+    # 응답 요약
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("✅ 응답 완료", f"{answered_total}문항")
+    with col2:
+        st.metric("❌ 미응답", f"{unanswered}문항")
+    with col3:
+        st.metric("📊 응답률", f"{answered_total/total_q*100:.0f}%")
+
+    if unanswered > 0:
+        st.warning(f"⚠️ 아직 {unanswered}개 문항에 답하지 않았어요! 정확한 결과를 위해 모두 응답해주세요.")
+
+    st.markdown("---")
+    st.markdown("### 📝 전체 응답 목록")
+
+    # 전체 응답 목록
+    for i, q in enumerate(all_questions):
+        is_bonus = i >= len(SBTI_QUESTIONS)
+
+        if is_bonus:
+            answer = st.session_state["sbti_bonus_answers"].get(q["id"])
+            q_label = "🎁 보너스"
+        else:
+            answer = st.session_state["sbti_answers"].get(q["id"])
+            q_label = f"제{i+1}문"
+
+        # 질문 텍스트 줄이기 (너무 길면)
+        short_text = q["text"][:60] + "..." if len(q["text"]) > 60 else q["text"]
+
+        if answer:
+            answer_text = q["choices"].get(answer, "?")
+            st.markdown(f"""
+            <div class='review-item'>
+                <strong>{q_label}</strong>: {short_text}<br>
+                <span class='selected-answer'>✅ 응답: {answer}) {answer_text}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class='review-item-unanswered'>
+                <strong>{q_label}</strong>: {short_text}<br>
+                ❌ <strong>미응답</strong>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # 수정 버튼
+        col_edit, col_space = st.columns([1, 3])
+        with col_edit:
+            if st.button(f"✏️ 수정", key=f"edit_{i}", use_container_width=True):
+                st.session_state["sbti_current_q"] = i
+                st.session_state["page"] = "sbti_test"
+                st.rerun()
+
+    # ─── 제출 버튼 ───
+    st.markdown("---")
+    st.markdown("""
+    <div class='submit-box'>
+        <h2>🎭 제출할 준비가 되셨나요?</h2>
+        <p>제출하면 AI가 당신의 영혼을 분석합니다...</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    submit_col1, submit_col2 = st.columns(2)
+
+    with submit_col1:
+        if st.button("⬅️ 문항으로 돌아가기", use_container_width=True, key="back_to_test"):
+            st.session_state["sbti_current_q"] = 0
+            st.session_state["page"] = "sbti_test"
+            st.rerun()
+
+    with submit_col2:
+        if answered_total == 0:
+            st.button("🚫 응답이 없습니다", use_container_width=True, disabled=True)
+        else:
+            if st.button("🚀 제출하고 결과 보기!", use_container_width=True, key="submit_btn", type="primary"):
+                st.session_state["page"] = "sbti_result"
+                st.rerun()
+
+
+# ─────────────────────────────────────────────
+# SBTI 결과 페이지
 # ─────────────────────────────────────────────
 def show_sbti_result():
     st.markdown("<p class='main-title'>🎭 SBTI 검사 결과</p>", unsafe_allow_html=True)
 
+    # 이미 결과가 있으면 바로 표시
+    if st.session_state["sbti_result"]:
+        st.markdown(st.session_state["sbti_result"])
+
+        answers = st.session_state["sbti_answers"]
+        pattern = calculate_sbti_pattern(answers)
+        pattern_str = pattern_to_string(pattern)
+
+        with st.expander("🔍 내 검사 패턴 상세보기"):
+            st.code(f"15차원 패턴: {pattern_str}")
+            for key, val in pattern.items():
+                model, dim = key.split("_")
+                st.write(f"- **{model}** → {dim}: **{val}**")
+
+        st.markdown(f"""
+        <div class='token-info'>
+            📊 AI 사용량 — 입력: {st.session_state["total_input_tokens"]:,} 토큰 | 출력: {st.session_state["total_output_tokens"]:,} 토큰
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 다시 검사하기", use_container_width=True, key="retry"):
+                reset_all()
+                st.session_state["page"] = "sbti_test"
+                st.session_state["test_type"] = "sbti"
+                st.rerun()
+        with col2:
+            if st.button("🏠 홈으로", use_container_width=True, key="result_home"):
+                reset_all()
+                st.rerun()
+        return
+
+    # 결과 생성
     answers = st.session_state["sbti_answers"]
     bonus_answers = st.session_state["sbti_bonus_answers"]
 
-    # 패턴 계산
     pattern = calculate_sbti_pattern(answers)
     pattern_str = pattern_to_string(pattern)
-
-    # 히든 유형 체크
     hidden = check_hidden_type(answers, bonus_answers)
 
-    # 유형 목록 텍스트
     all_types_text = ""
     for category, types in SBTI_TYPES.items():
+        all_types_text += f"\n[{category}]\n"
         for t in types:
-            all_types_text += f"- {t['code']} ({t['name']})\n"
+            all_types_text += f"  - {t['code']} ({t['name']})\n"
 
-    # AI에게 유형 판별 요청
     analysis_prompt = f"""너는 SBTI(Satirical Behavioral Type Indicator, 풍자적 행동 유형 지표) 전문 분석가야.
 
 사용자의 검사 결과를 분석해서 가장 적합한 SBTI 유형을 판별해줘.
@@ -746,7 +882,7 @@ def show_sbti_result():
 - 행동 모델: 실행력={pattern.get("행동_실행력","M")}, 목표지향={pattern.get("행동_목표지향","M")}, 계획성={pattern.get("행동_계획성","M")}
 - 사회 모델: 친밀욕구={pattern.get("사회_친밀욕구","M")}, 사회적거리={pattern.get("사회_사회적거리","M")}, 독립성={pattern.get("사회_독립성","M")}
 
-{"히든 유형 조건 감지: " + hidden if hidden else "히든 유형 조건 없음"}
+{"히든 유형 조건 감지됨: " + hidden + " → 이 유형으로 판별해줘!" if hidden else "히든 유형 조건 없음"}
 
 ## SBTI 유형 목록
 {all_types_text}
@@ -760,18 +896,18 @@ def show_sbti_result():
 ---
 
 ## 💀 팩폭 분석
-(이 유형에 대한 풍자적이고 뼈 때리는 분석을 3-5문단으로 작성. 웃기면서도 정확한 통찰을 담아줘. 독설과 애정을 섞어서. 한국 MZ세대 말투로.)
+(이 유형에 대한 풍자적이고 뼈 때리는 분석 3-5문단. 웃기면서 정확한 통찰. 독설+애정. MZ세대 말투.)
 
 ---
 
 ## 📊 5대 모델 분석
 | 모델 | 결과 | 해석 |
 |------|------|------|
-| 자아 | L/M/H | 한 줄 해석 |
-| 감정 | L/M/H | 한 줄 해석 |
-| 태도 | L/M/H | 한 줄 해석 |
-| 행동 | L/M/H | 한 줄 해석 |
-| 사회 | L/M/H | 한 줄 해석 |
+| 자아 | {pattern.get("자아_자기인식","M")}{pattern.get("자아_자기수용","M")}{pattern.get("자아_자아일관성","M")} | 한 줄 해석 |
+| 감정 | {pattern.get("감정_정서안정","M")}{pattern.get("감정_감정표현","M")}{pattern.get("감정_공감력","M")} | 한 줄 해석 |
+| 태도 | {pattern.get("태도_낙관성","M")}{pattern.get("태도_신뢰성","M")}{pattern.get("태도_개방성","M")} | 한 줄 해석 |
+| 행동 | {pattern.get("행동_실행력","M")}{pattern.get("행동_목표지향","M")}{pattern.get("행동_계획성","M")} | 한 줄 해석 |
+| 사회 | {pattern.get("사회_친밀욕구","M")}{pattern.get("사회_사회적거리","M")}{pattern.get("사회_독립성","M")} | 한 줄 해석 |
 
 ---
 
@@ -791,7 +927,7 @@ def show_sbti_result():
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=2000,
-                system="너는 SBTI 풍자적 성격 검사 전문 분석가야. 독설과 유머와 정확한 통찰을 섞어서 결과를 알려줘. 한국어로, MZ세대 말투로 써줘. 재미있게!",
+                system="너는 SBTI 풍자적 성격 검사 전문 분석가야. 독설과 유머와 정확한 통찰을 섞어서 결과를 알려줘. 한국어로, MZ세대 말투로 써줘. 재미있고 뼈 때리게!",
                 messages=[{"role": "user", "content": analysis_prompt}],
             )
 
@@ -800,38 +936,12 @@ def show_sbti_result():
             st.session_state["total_output_tokens"] += response.usage.output_tokens
             st.session_state["sbti_result"] = result_text
 
-            # 결과 표시
-            st.markdown(result_text)
-
-            st.markdown("---")
-
-            # 패턴 정보
-            with st.expander("🔍 내 검사 패턴 상세보기"):
-                st.code(f"15차원 패턴: {pattern_str}")
-                st.json(pattern)
-
-            # 토큰 사용량
-            st.markdown(f"""
-            <div class='token-info'>
-                📊 AI 사용량 — 입력: {st.session_state["total_input_tokens"]:,} 토큰 | 출력: {st.session_state["total_output_tokens"]:,} 토큰
-            </div>
-            """, unsafe_allow_html=True)
+            st.rerun()
 
         except Exception as e:
             st.error(f"❌ 분석 중 오류가 발생했습니다: {e}")
-
-    st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔄 다시 검사하기", use_container_width=True):
-            reset_all()
-            st.session_state["page"] = "sbti_test"
-            st.session_state["test_type"] = "sbti"
-            st.rerun()
-    with col2:
-        if st.button("🏠 홈으로 돌아가기", use_container_width=True):
-            reset_all()
-            st.rerun()
+            if st.button("🔄 다시 시도", key="retry_error"):
+                st.rerun()
 
 
 # ─────────────────────────────────────────────
@@ -845,6 +955,8 @@ elif page == "mbti_test":
     show_mbti_test()
 elif page == "sbti_test":
     show_sbti_test()
+elif page == "sbti_review":
+    show_sbti_review()
 elif page == "sbti_result":
     show_sbti_result()
 else:
