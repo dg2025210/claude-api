@@ -11,7 +11,7 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# CSS 스타일
+# CSS
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -35,13 +35,6 @@ st.markdown("""
         text-align: center;
         margin-top: 1rem;
     }
-    .help-box {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 10px;
-        font-size: 0.9rem;
-        margin: 0.5rem 0;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -57,7 +50,7 @@ except Exception:
 client = Anthropic(api_key=api_key)
 
 # ─────────────────────────────────────────────
-# SBTI 문항 데이터 (AI에게 전달용)
+# SBTI 문항 데이터
 # ─────────────────────────────────────────────
 SBTI_QUESTIONS_TEXT = """
 제1문 [사회-친밀욕구]
@@ -205,22 +198,46 @@ HHHH(???) — 극단적 응답 패턴 시
 # ─────────────────────────────────────────────
 SBTI_SYSTEM_PROMPT = f"""너는 SBTI(Satirical Behavioral Type Indicator, 풍자적 행동 유형 지표) 검사를 진행하는 AI 검사관이야.
 
-## 너의 역할
-1. 사용자에게 SBTI 문항을 **채팅 대화 형식으로** 하나씩 제시해.
-2. 문항을 제시할 때 질문 내용과 선택지(A/B/C)를 보여줘.
-3. 사용자가 A, B, C (또는 선택지 내용)로 답하면 짧고 재미있는 리액션을 하고 다음 문항으로 넘어가.
-4. 사용자가 "이전"이라고 하면 바로 직전 문항을 다시 보여주고, 다시 답할 수 있게 해. 이전 응답은 새 응답으로 덮어써.
-5. 사용자가 "제출"이라고 하면, 현재까지 응답한 문항 기반으로 바로 결과를 분석해줘.
-6. 30문항 + 보너스 1문항 = 총 31문항이 끝나면 자동으로 결과를 분석해.
-7. 중간중간 MZ세대 말투로 짧은 리액션, 드립, 공감을 섞어줘. 근데 너무 길지 않게.
-8. 현재 진행 상황(예: "5/31")을 간단히 알려줘.
+## 검사 진행 단계
 
-## 중요 규칙
-- 문항은 반드시 아래 문항 데이터의 순서와 내용을 정확히 따라.
-- 선택지도 정확히 그대로 보여줘.
-- 사용자가 A/B/C/D 중 하나로 답하면 인정. "동의", "비동의" 같은 텍스트 답변도 매칭해서 인정.
-- 사용자가 엉뚱한 답을 하면 재미있게 다시 물어봐.
-- 모든 응답을 내부적으로 기록해서 마지막에 분석에 사용해.
+### [1단계: 문항 진행]
+1. 사용자에게 SBTI 문항을 채팅 대화로 하나씩 제시해.
+2. 문항 제시할 때 질문 내용과 선택지(A/B/C)를 보여줘.
+3. 사용자가 답하면 짧고 재미있는 리액션 + 다음 문항.
+4. "이전" → 직전 문항 다시 제시, 다시 답변 가능.
+5. "제출" → 현재까지 응답 기반으로 바로 2단계로.
+6. 30문항 + 보너스 1문항 = 31문항 끝나면 자동으로 2단계.
+7. MZ세대 말투로 짧은 리액션, 드립, 공감. 너무 길지 않게.
+8. 진행 상황(예: "5/31") 표시.
+
+### [2단계: 결과 발표]
+모든 문항이 끝나거나 "제출" 시:
+- 유형코드와 별명만 짧게 알려줘.
+- 형식:
+
+🎭 **검사 완료!**
+# 너의 SBTI 유형은... [유형코드] ([별명])!
+
+궁금한 거 있으면 뭐든 물어봐! 예를 들면:
+- "팩폭 해줘" → 뼈 때리는 풍자 분석
+- "궁합 알려줘" → 잘 맞는/안 맞는 유형
+- "5대 모델 분석" → 상세 심리 모델 결과
+- "장점/단점" → 이 유형의 특징
+- "한 줄 요약" → 킬러 한 마디
+- 그 외 아무거나!
+
+⚠️ 절대로 유형코드+별명 외의 상세 분석, 궁합, 모델 분석 등을 자동으로 보여주지 마. 사용자가 물어볼 때만 답해.
+
+### [3단계: 자유 대화]
+- 사용자가 궁금한 걸 물어보면 그때그때 답해줘.
+- "팩폭" → 풍자적이고 뼈 때리는 분석 3-5문단. 독설+애정+유머. MZ세대 말투.
+- "궁합" → 찰떡궁합, 좋은 궁합, 최악의 궁합 각각 유형코드+별명+이유.
+- "5대 모델" 또는 "모델 분석" → 5대 모델별 L/M/H 결과와 해석을 표로.
+- "장점" → 이 유형의 장점 2-3개.
+- "단점" → 이 유형의 단점 2-3개.
+- "한 줄 요약" → 킬러 문장 하나.
+- 다른 질문에도 유형 기반으로 재미있게 답해줘.
+- 항상 풍자적이고 재미있는 SBTI 말투 유지.
 
 ## SBTI 문항 데이터
 {SBTI_QUESTIONS_TEXT}
@@ -229,104 +246,72 @@ SBTI_SYSTEM_PROMPT = f"""너는 SBTI(Satirical Behavioral Type Indicator, 풍자
 {SBTI_TYPES_TEXT}
 
 ## L/M/H 매핑 규칙
-대부분의 문항: A=L(낮음), B=M(중간), C=H(높음)
-역코딩 문항:
-- 제1문: A=H, B=M, C=L (동의=높음)
-- 제2문: A=H, B=M, C=L (공감=높음)
-- 제4문: A=H, B=M, C=L (동의=높음)
-- 제9문: A=H, B=M, C=L (걱정많음=정서불안)
-- 제22문: A=H, B=M, C=L (동의=높음)
-- 제30문: A=L, B=M, C=H (동의=낙관성 낮음 → 역전)
+대부분: A=L, B=M, C=H
+역코딩: 제1문(A=H), 제2문(A=H), 제4문(A=H), 제9문(A=H), 제22문(A=H), 제30문(A=L,C=H → 동의=낙관성 낮음)
 
-## 5대 모델 × 3차원 = 15차원
+## 5대 모델 × 3차원
 자아: 자기인식, 자기수용, 자아일관성
 감정: 정서안정, 감정표현, 공감력
 태도: 낙관성, 신뢰성, 개방성
 행동: 실행력, 목표지향, 계획성
 사회: 친밀욕구, 사회적거리, 독립성
 
-## 히든 유형 조건
-- DRUNK(취객): 보너스 문항에서 C(음주) 선택
-- HHHH(???): 전체 응답의 85% 이상이 같은 선택지(A만 또는 C만)
-
-## 결과 분석 시 반드시 포함할 내용
-
-🎭 **당신의 SBTI 유형**
-# [유형코드] ([별명])
-
----
-## 💀 팩폭 분석
-(풍자적이고 뼈 때리는 분석 3-5문단. 웃기면서 정확한 통찰. 독설+애정. MZ세대 말투.)
-
----
-## 📊 5대 모델 분석
-| 모델 | 패턴 | 해석 |
-|------|------|------|
-| 자아 | L/M/H | 해석 |
-| 감정 | L/M/H | 해석 |
-| 태도 | L/M/H | 해석 |
-| 행동 | L/M/H | 해석 |
-| 사회 | L/M/H | 해석 |
-
----
-## 💕 궁합
-- **찰떡궁합**: [유형코드] ([별명]) — 이유
-- **좋은 궁합**: [유형코드] ([별명]) — 이유
-- **최악의 궁합**: [유형코드] ([별명]) — 이유
-
----
-## 🔥 한 줄 요약
-(이 유형을 한 문장으로 정리하는 킬러 문장)
+## 히든 유형
+- DRUNK(취객): 보너스에서 C(음주) 선택
+- HHHH(???): 85% 이상 같은 선택지
 
 ## 첫 메시지
-첫 메시지에서:
 1. 짧고 재미있게 인사
-2. SBTI 검사가 뭔지 한두 줄 설명
-3. 사용법 안내: A/B/C로 답하면 됨, "이전" 치면 이전 문항, "제출" 치면 바로 결과
+2. SBTI 한두 줄 설명
+3. 사용법: A/B/C로 답, "이전"=이전문항, "제출"=바로결과
 4. 바로 제1문 제시
 """
 
 MBTI_SYSTEM_PROMPT = """당신은 MBTI 성격 유형 전문 분석가입니다.
 
-역할:
-1. 사용자에게 자연스러운 대화형 질문을 하나씩 해서 MBTI 4가지 지표(E/I, S/N, T/F, J/P)를 파악합니다.
-2. 질문은 한 번에 하나만. 일상적이고 재미있는 상황 질문을 하세요.
-3. 총 8~12개 질문 후 충분히 파악되면 결과를 알려주세요.
-4. "이전"이라고 하면 직전 질문을 다시 해주세요.
-5. "제출"이라고 하면 현재까지 파악한 것을 기반으로 바로 결과를 알려주세요.
-6. 결과를 알려줄 때 반드시 아래 형식 포함:
+## 검사 진행 단계
 
-🔮 **당신의 MBTI 유형**
-# [4글자 코드] ([별명])
+### [1단계: 대화형 질문]
+1. 사용자에게 자연스러운 대화형 질문을 하나씩 해서 E/I, S/N, T/F, J/P를 파악.
+2. 질문은 한 번에 하나만. 일상적이고 재미있는 상황 질문.
+3. 총 8~12개 질문 후 파악되면 2단계로.
+4. "이전" → 직전 질문 다시.
+5. "제출" → 현재까지 파악한 것 기반으로 바로 2단계로.
+6. MZ세대 말투로 친근하게.
 
----
-## 🧬 유형 분석
-(이 유형에 대한 상세하고 재미있는 분석 3-4문단)
+### [2단계: 결과 발표]
+유형코드와 별명만 짧게 알려줘:
 
----
-## 📊 4가지 지표
-| 지표 | 결과 | 해석 |
-|------|------|------|
-| E/I | ? | 해석 |
-| S/N | ? | 해석 |
-| T/F | ? | 해석 |
-| J/P | ? | 해석 |
+🔮 **검사 완료!**
+# 너의 MBTI는... [4글자코드] ([별명])!
 
----
-## 💕 궁합
-- **찰떡궁합**: [유형] — 이유
-- **좋은 궁합**: [유형] — 이유
-- **최악의 궁합**: [유형] — 이유
+궁금한 거 있으면 뭐든 물어봐! 예를 들면:
+- "상세 분석" → 유형 상세 설명
+- "궁합 알려줘" → 잘 맞는/안 맞는 유형
+- "4가지 지표 분석" → E/I, S/N, T/F, J/P 상세
+- "장점/단점"
+- "한 줄 요약"
+- 그 외 아무거나!
 
----
-## 🔥 한 줄 요약
-(킬러 문장)
+⚠️ 절대로 유형코드+별명 외의 내용을 자동으로 보여주지 마. 사용자가 물어볼 때만 답해.
 
-7. 한국어, MZ세대 말투, 친근한 반말로.
-8. 첫 메시지에서 인사 + MBTI 대화형 검사 설명 + "이전"/"제출" 명령어 안내 + 첫 질문."""
+### [3단계: 자유 대화]
+사용자가 물어보는 것에 맞춰 답해줘:
+- "상세 분석" → 3-4문단 재미있는 분석
+- "궁합" → 찰떡/좋은/최악 궁합 유형+이유
+- "지표 분석" → 4가지 지표별 결과 표
+- "장점" → 2-3개
+- "단점" → 2-3개
+- "한 줄 요약" → 킬러 문장
+- 다른 질문에도 유형 기반으로 재미있게.
+- 항상 친근한 MZ 말투 유지.
+
+## 첫 메시지
+인사 + MBTI 대화형 검사 설명 + "이전"/"제출" 안내 + 첫 질문
+한국어, 반말로."""
 
 # ─────────────────────────────────────────────
-# 세션 상태 초기화
+# 세션 상태
 # ─────────────────────────────────────────────
 defaults = {
     "page": "home",
@@ -368,7 +353,7 @@ def show_home():
 
         - 🗣️ AI가 질문하고 분석
         - 💬 자유로운 대화형 검사
-        - 📊 상세한 유형 + 궁합
+        - ❓ 결과 후 궁금한 건 직접 질문!
         """)
         if st.button("🔮 MBTI 검사 시작", use_container_width=True, key="btn_mbti"):
             st.session_state["page"] = "test"
@@ -383,11 +368,11 @@ def show_home():
         **27가지 풍자적 유형**
 
         AI와 대화하며 30문항에 답하고
-        뼈 때리는 팩폭 결과를 받으세요!
+        결과 후 원하는 것만 골라 질문!
 
         - 💬 AI가 문항을 대화로 제시
         - ⬅️ "이전" 입력하면 수정 가능
-        - 💀 풍자적 팩폭 분석
+        - ❓ 팩폭, 궁합 등 직접 질문!
         """)
         if st.button("🎭 SBTI 검사 시작", use_container_width=True, key="btn_sbti"):
             st.session_state["page"] = "test"
@@ -401,7 +386,7 @@ def show_home():
 
 
 # ─────────────────────────────────────────────
-# 대화형 검사 페이지 (MBTI / SBTI 공용)
+# 대화형 검사 페이지
 # ─────────────────────────────────────────────
 def show_test():
     test_type = st.session_state["test_type"]
@@ -418,24 +403,44 @@ def show_test():
         first_msg = "안녕! SBTI 검사 시작해줘!"
 
     st.markdown(f"<p class='main-title'>{icon} {title}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p class='sub-title'>AI와 대화하며 검사를 진행합니다</p>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>AI와 대화하며 검사를 진행합니다</p>", unsafe_allow_html=True)
 
     # 사이드바
     with st.sidebar:
-        st.markdown(f"## {icon} {title} 진행 중")
+        st.markdown(f"## {icon} {title}")
         st.markdown("---")
 
-        st.markdown("""
-        <div class='help-box'>
+        st.markdown("### 💡 사용법")
+        if test_type == "sbti":
+            st.markdown("""
+            **검사 중:**
+            - `A` / `B` / `C` → 답변 선택
+            - `이전` → 이전 문항으로
+            - `제출` → 바로 결과 보기
 
-        **💡 사용법**
+            **결과 나온 후:**
+            - `팩폭 해줘` → 뼈 때리는 분석
+            - `궁합 알려줘` → 유형 궁합
+            - `5대 모델 분석` → 상세 결과
+            - `장점` / `단점`
+            - `한 줄 요약`
+            - 아무거나 자유롭게!
+            """)
+        else:
+            st.markdown("""
+            **검사 중:**
+            - 자유롭게 답변
+            - `이전` → 이전 질문으로
+            - `제출` → 바로 결과 보기
 
-        - **A / B / C** → 답변 선택
-        - **"이전"** → 이전 문항으로
-        - **"제출"** → 바로 결과 보기
-
-        </div>
-        """, unsafe_allow_html=True)
+            **결과 나온 후:**
+            - `상세 분석` → 유형 설명
+            - `궁합 알려줘` → 유형 궁합
+            - `지표 분석` → E/I, S/N 등
+            - `장점` / `단점`
+            - `한 줄 요약`
+            - 아무거나 자유롭게!
+            """)
 
         st.markdown("---")
         st.markdown("### 📊 토큰 사용량")
@@ -446,18 +451,17 @@ def show_test():
             st.metric("출력", f"{st.session_state['total_output_tokens']:,}")
 
         st.markdown("---")
-        if st.button("🏠 홈으로 돌아가기", use_container_width=True, key="sidebar_home"):
+        if st.button("🏠 홈으로", use_container_width=True, key="side_home"):
             reset_test()
             st.rerun()
-
-        if st.button("🔄 처음부터 다시하기", use_container_width=True, key="sidebar_reset"):
+        if st.button("🔄 처음부터 다시", use_container_width=True, key="side_reset"):
             st.session_state["messages"] = []
             st.session_state["started"] = False
             st.rerun()
 
-    # 첫 AI 메시지 생성
+    # 첫 AI 메시지
     if not st.session_state["started"]:
-        with st.spinner(f"{icon} AI가 준비 중..."):
+        with st.spinner(f"{icon} AI 준비 중..."):
             try:
                 response = client.messages.create(
                     model="claude-sonnet-4-20250514",
@@ -475,7 +479,7 @@ def show_test():
                 st.error(f"❌ 오류: {e}")
                 return
 
-    # 대화 내용 표시
+    # 대화 표시
     for msg in st.session_state["messages"]:
         if msg["role"] == "assistant":
             with st.chat_message("assistant", avatar=icon):
@@ -484,53 +488,15 @@ def show_test():
             with st.chat_message("user", avatar="🧑‍🎓"):
                 st.markdown(msg["content"])
 
-    # 결과가 나왔는지 확인
-    last_ai = ""
-    for msg in reversed(st.session_state["messages"]):
-        if msg["role"] == "assistant":
-            last_ai = msg["content"]
-            break
-
-    is_finished = False
-    if test_type == "mbti":
-        if "찰떡궁합" in last_ai and "한 줄 요약" in last_ai:
-            is_finished = True
-    else:
-        if "팩폭 분석" in last_ai and "한 줄 요약" in last_ai:
-            is_finished = True
-
-    if is_finished:
-        st.markdown("---")
-        st.success(f"🎉 {title} 완료!")
-        st.markdown(f"""
-        <div class='token-info'>
-            📊 총 사용 토큰 — 입력: {st.session_state['total_input_tokens']:,} | 출력: {st.session_state['total_output_tokens']:,}
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔄 다시 검사하기", use_container_width=True, key="again"):
-                st.session_state["messages"] = []
-                st.session_state["started"] = False
-                st.rerun()
-        with col2:
-            if st.button("🏠 다른 검사 하러가기", use_container_width=True, key="other"):
-                reset_test()
-                st.rerun()
-        return
-
     # 사용자 입력
-    user_input = st.chat_input("A, B, C로 답하거나 자유롭게 입력하세요! (이전/제출)")
+    user_input = st.chat_input("답변을 입력하세요! (A/B/C, 이전, 제출, 또는 자유롭게)")
 
     if user_input:
         st.session_state["messages"].append({"role": "user", "content": user_input})
 
-        # API 호출용 메시지 구성 (첫 메시지 포함)
         api_messages = [{"role": "user", "content": first_msg}] + st.session_state["messages"]
 
-        with st.spinner(f"{icon} AI가 응답 중..."):
+        with st.spinner(f"{icon} AI 응답 중..."):
             try:
                 response = client.messages.create(
                     model="claude-sonnet-4-20250514",
@@ -549,7 +515,7 @@ def show_test():
 
 
 # ─────────────────────────────────────────────
-# 페이지 라우팅
+# 라우팅
 # ─────────────────────────────────────────────
 page = st.session_state["page"]
 
